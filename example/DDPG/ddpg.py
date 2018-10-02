@@ -28,7 +28,8 @@ class DDPG:
         # with both their target networks
         self.state_dim = 12
         self.action_dim = 10
-
+        self.has_kicked = False
+        self.laststep_haskicked = False
         self.sess = tf.InteractiveSession()
 
         self.actor_network = ActorNetwork(self.sess,self.state_dim,self.action_dim)

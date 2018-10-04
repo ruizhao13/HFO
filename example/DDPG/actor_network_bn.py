@@ -2,12 +2,12 @@ import tensorflow as tf
 from tensorflow.contrib.layers.python.layers import batch_norm as batch_norm
 import numpy as np
 import math
-
+from functools import partial
 
 # Hyper Parameters
 LAYER1_SIZE = 400
 LAYER2_SIZE = 300
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 1e-3
 TAU = 0.001
 BATCH_SIZE = 64
 
@@ -63,9 +63,9 @@ class ActorNetwork:
 
 		layer0_bn = self.batch_norm_layer(state_input,training_phase=is_training,scope_bn='batch_norm_0',activation=tf.identity)
 		layer1 = tf.matmul(layer0_bn,W1) + b1
-		layer1_bn = self.batch_norm_layer(layer1,training_phase=is_training,scope_bn='batch_norm_1',activation=tf.nn.relu)
+		layer1_bn = self.batch_norm_layer(layer1,training_phase=is_training,scope_bn='batch_norm_1',activation=partial(tf.nn.leaky_relu, alpha=0.01))
 		layer2 = tf.matmul(layer1_bn,W2) + b2
-		layer2_bn = self.batch_norm_layer(layer2,training_phase=is_training,scope_bn='batch_norm_2',activation=tf.nn.relu)
+		layer2_bn = self.batch_norm_layer(layer2,training_phase=is_training,scope_bn='batch_norm_2',activation=partial(tf.nn.leaky_relu, alpha=0.01))
 
 		action_output = tf.matmul(layer2_bn,W3) + b3
 
@@ -94,31 +94,31 @@ class ActorNetwork:
 
 	def train(self,q_gradient_batch,state_batch):
 		action_batch = self.actions(state_batch)
-		print("action")
-		print(action_batch[0])
-		print("gradient")
-		print(q_gradient_batch[0])
+		# print("action")
+		# print(action_batch[0])
+		# print("gradient")
+		# print(q_gradient_batch)
 		a = q_gradient_batch.max(axis=1)
 		b = np.resize(a, [len(action_batch), 1])
 		q_gradient_batch = q_gradient_batch / b
-		print("gradient_norm")
-		print(q_gradient_batch[0])
-		print("gradient_xishu")
-		for i in range(self.action_dim):
-			print((self.action_up_bound[i] - action_batch[0][i]) / (self.action_up_bound[i] - self.action_bottom_bound[i]), end='  ')
+		# print("gradient_norm")
+		# print(q_gradient_batch[0])
+		# print("gradient_xishu")
+		# for i in range(self.action_dim):
+			# print((self.action_up_bound[i] - action_batch[0][i]) / (self.action_up_bound[i] - self.action_bottom_bound[i]), end='  ')
 		for _, q_gra in enumerate(q_gradient_batch):
 			for i in range(self.action_dim):
 				if q_gra[i] > 0:
 					q_gradient_batch[_][i] = q_gradient_batch[_][i] * (self.action_up_bound[i] - action_batch[_][i]) / (self.action_up_bound[i] - self.action_bottom_bound[i])
-					if _==0:
-						print((self.action_up_bound[i] - action_batch[0][i]) / (self.action_up_bound[i] - self.action_bottom_bound[i]), end='  ')
+					# if _==0:
+						# print((self.action_up_bound[i] - action_batch[0][i]) / (self.action_up_bound[i] - self.action_bottom_bound[i]), end='  ')
 				else:
 					q_gradient_batch[_][i] = q_gradient_batch[_][i] * (action_batch[_][i] - self.action_bottom_bound[i]) / (self.action_up_bound[i] - self.action_bottom_bound[i])
-					if _==0:
-						print((action_batch[_][i] - self.action_bottom_bound[i]) / (self.action_up_bound[i] - self.action_bottom_bound[i]), end='  ')
-		print()
-		print("gradient_changed")
-		print(q_gradient_batch[0])
+					# if _==0:
+						# print((action_batch[_][i] - self.action_bottom_bound[i]) / (self.action_up_bound[i] - self.action_bottom_bound[i]), end='  ')
+		# print()
+		# print("gradient_changed")
+		# print(q_gradient_batch[0])
 		self.sess.run(self.optimizer,feed_dict={
 			self.q_gradient_input:q_gradient_batch,
 			self.state_input:state_batch,

@@ -100,6 +100,8 @@ def main():
         if status == hfo.SERVER_DOWN:
             hfo_env.act(hfo.QUIT)
             exit()
+        print(episode)
+        print(episode % 100 == 0 and episode > 100)
         if episode % 100 == 0 and episode > 100:
             total_reward = 0
             for i in range(TEST):

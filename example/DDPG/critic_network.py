@@ -38,7 +38,7 @@ class CriticNetwork:
 		# Define training optimizer
 		self.y_input = tf.placeholder("float",[None,1])
 		weight_decay = tf.add_n([L2 * tf.nn.l2_loss(var) for var in self.net])
-		self.cost = -tf.reduce_mean(tf.square(self.y_input - self.q_value_output)) + weight_decay
+		self.cost = tf.reduce_mean(tf.square(self.y_input - self.q_value_output)) + weight_decay
 		self.optimizer = tf.train.AdamOptimizer(LEARNING_RATE).minimize(self.cost)
 		self.action_gradients = tf.gradients(self.q_value_output,self.action_input)
 
@@ -49,32 +49,40 @@ class CriticNetwork:
 
 		state_input = tf.placeholder("float",[None,state_dim])
 		action_input = tf.placeholder("float",[None,action_dim])
+		critic_input = tf.concat([state_input, action_input], 1)
+		W1 = self.variable([state_dim + action_dim, layer1_size], state_dim + action_dim)
+		b1 = self.variable([layer1_size], state_dim + action_dim)
+		W2 = self.variable([layer1_size, layer2_size], layer1_size)
+		b2 = self.variable([layer2_size], layer2_size)
+		W3 = tf.Variable(tf.random_uniform([layer2_size, 1], -3e-3, 3e-3))
+		b3 = tf.Variable(tf.random_uniform([1], -3e-3, 3e-3))
+		
+		# W1 = self.variable([state_dim,layer1_size],state_dim)
+		# b1 = self.variable([layer1_size],state_dim)
+		# W2 = self.variable([layer1_size,layer2_size],layer1_size+action_dim)
+		# W2_action = self.variable([action_dim,layer2_size],layer1_size+action_dim)
+		# b2 = self.variable([layer2_size],layer1_size+action_dim)
+		# W3 = tf.Variable(tf.random_uniform([layer2_size,1],-3e-3,3e-3))
+		# b3 = tf.Variable(tf.random_uniform([1],-3e-3,3e-3))
 
-		W1 = self.variable([state_dim,layer1_size],state_dim)
-		b1 = self.variable([layer1_size],state_dim)
-		W2 = self.variable([layer1_size,layer2_size],layer1_size+action_dim)
-		W2_action = self.variable([action_dim,layer2_size],layer1_size+action_dim)
-		b2 = self.variable([layer2_size],layer1_size+action_dim)
-		W3 = tf.Variable(tf.random_uniform([layer2_size,1],-3e-3,3e-3))
-		b3 = tf.Variable(tf.random_uniform([1],-3e-3,3e-3))
-
-		layer1 = tf.nn.relu(tf.matmul(state_input,W1) + b1)
-		layer2 = tf.nn.relu(tf.matmul(layer1,W2) + tf.matmul(action_input,W2_action) + b2)
+		layer1 = tf.nn.leaky_relu(tf.matmul(critic_input,W1) + b1, alpha=0.01)
+		layer2 = tf.nn.leaky_relu(tf.matmul(layer1,W2) + b2, alpha=0.01)
 		q_value_output = tf.identity(tf.matmul(layer2,W3) + b3)
 
-		return state_input,action_input,q_value_output,[W1,b1,W2,W2_action,b2,W3,b3]
+		return state_input,action_input,q_value_output,[W1,b1,W2,b2,W3,b3]
 
 	def create_target_q_network(self,state_dim,action_dim,net):
 		state_input = tf.placeholder("float",[None,state_dim])
 		action_input = tf.placeholder("float",[None,action_dim])
-
+		critic_input = tf.concat([state_input, action_input], 1)
+		
 		ema = tf.train.ExponentialMovingAverage(decay=1-TAU)
 		target_update = ema.apply(net)
 		target_net = [ema.average(x) for x in net]
 
-		layer1 = tf.nn.relu(tf.matmul(state_input,target_net[0]) + target_net[1])
-		layer2 = tf.nn.relu(tf.matmul(layer1,target_net[2]) + tf.matmul(action_input,target_net[3]) + target_net[4])
-		q_value_output = tf.identity(tf.matmul(layer2,target_net[5]) + target_net[6])
+		layer1 = tf.nn.relu(tf.matmul(critic_input,target_net[0]) + target_net[1])
+		layer2 = tf.nn.relu(tf.matmul(layer1,target_net[2]) + target_net[3])
+		q_value_output = tf.identity(tf.matmul(layer2,target_net[4]) + target_net[5])
 
 		return state_input,action_input,q_value_output,target_update
 
@@ -90,6 +98,10 @@ class CriticNetwork:
 			})
 
 	def gradients(self,state_batch,action_batch):
+		# print("state_batch")
+		# print(state_batch)
+		# print("action_batch")
+		# print(action_batch)
 		return self.sess.run(self.action_gradients,feed_dict={
 			self.state_input:state_batch,
 			self.action_input:action_batch

@@ -10,14 +10,14 @@ from ou_noise import OUNoise
 from critic_network import CriticNetwork 
 from actor_network_bn import ActorNetwork
 from replay_buffer import ReplayBuffer
-
+import random
 # Hyper Parameters:
 
 REPLAY_BUFFER_SIZE = 1000000
 REPLAY_START_SIZE = 10000
 BATCH_SIZE = 64
 GAMMA = 0.99
-
+EPSILON = 0.99
 
 class DDPG:
     """docstring for DDPG"""
@@ -58,6 +58,7 @@ class DDPG:
         
         next_action_batch = self.actor_network.target_actions(next_state_batch)
         q_value_batch = self.critic_network.target_q(next_state_batch,next_action_batch)
+        # print(q_value_batch)
         y_batch = []  
         for i in range(len(minibatch)): 
             if done_batch[i]:
@@ -71,17 +72,34 @@ class DDPG:
         # Update the actor policy using the sampled gradient:
         action_batch_for_gradients = self.actor_network.actions(state_batch)
         q_gradient_batch = self.critic_network.gradients(state_batch,action_batch_for_gradients)
-
+        # print(q_gradient_batch)
         self.actor_network.train(q_gradient_batch,state_batch)
 
         # Update the target networks
         self.actor_network.update_target()
         self.critic_network.update_target()
 
-    def noise_action(self,state):
+    def noise_action2(self,state):
         # Select action a_t according to the current policy and exploration noise
         action = self.actor_network.action(state)
         return action+self.exploration_noise.noise()
+
+    def noise_action(self, state):
+        action = self.actor_network.action(state)
+        random_action = np.zeros(10, float)
+        random_action[random.randint(0,3)] = 1
+        random_action[4] = random.uniform(-100, 100)#DASH POWER
+        random_action[5] = random.uniform(-180, 180)#DASH DEGREES
+        random_action[6] = random.uniform(-180, 180)#TURN DEGREES
+        random_action[7] = random.uniform(-180, 180)#TACKLE DEGREES
+        random_action[8] = random.uniform(0, 100)#KICK POWER
+        random_action[9] = random.uniform(-180, 180)#KICK DEGREES
+        if np.random.uniform() < EPSILON:
+            return action
+        else:
+            return random_action
+
+
 
     def action(self,state):
         action = self.actor_network.action(state)
@@ -102,12 +120,6 @@ class DDPG:
         # Re-iniitialize the random process when an episode ends
         if done:
             self.exploration_noise.reset()
-
-
-
-
-
-
 
 
 

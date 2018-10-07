@@ -1,12 +1,14 @@
 import tensorflow as tf 
-from tensorflow.contrib.layers.python.layers import batch_norm as batch_norm
+# from tensorflow.contrib.layers.python.layers import batch_norm as batch_norm
 import numpy as np
 import math
 from functools import partial
 
 # Hyper Parameters
-LAYER1_SIZE = 400
-LAYER2_SIZE = 300
+LAYER1_SIZE = 1024
+LAYER2_SIZE = 512
+LAYER3_SIZE = 256
+LAYER4_SIZE = 128
 LEARNING_RATE = 1e-3
 TAU = 0.001
 BATCH_SIZE = 64
@@ -38,13 +40,9 @@ class ActorNetwork:
 
 	def create_training_method(self):
 		self.q_gradient_input = tf.placeholder("float",[None,self.action_dim])
-		
 		self.parameters_gradients = tf.gradients(self.action_output,self.net,self.q_gradient_input)
 		self.optimizer = tf.train.AdamOptimizer(LEARNING_RATE).apply_gradients(zip(self.parameters_gradients,self.net))
 
-	def create_network_zr(self, state_dim, action_dim):
-		state_input = tf.placeholder("float", [None, state_dim])
-		is_training = tf.placeholder(tf.bool)
 		
 
 	def create_network(self,state_dim,action_dim):

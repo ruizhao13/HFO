@@ -8,12 +8,12 @@ import tensorflow as tf
 import numpy as np
 from ou_noise import OUNoise
 from critic_network import CriticNetwork 
-from actor_network_bn import ActorNetwork
+from actor_network import ActorNetwork
 from replay_buffer import ReplayBuffer
 import random
 # Hyper Parameters:
 
-REPLAY_BUFFER_SIZE = 1000000
+REPLAY_BUFFER_SIZE = 500000
 REPLAY_START_SIZE = 10000
 BATCH_SIZE = 64
 GAMMA = 0.99
@@ -45,6 +45,7 @@ class DDPG:
         #print "train step",self.time_step
         # Sample a random minibatch of N transitions from replay buffer
         minibatch = self.replay_buffer.get_batch(BATCH_SIZE)
+        # print(minibatch)
         state_batch = np.asarray([data[0] for data in minibatch])
         action_batch = np.asarray([data[1] for data in minibatch])
         reward_batch = np.asarray([data[2] for data in minibatch])
@@ -71,8 +72,13 @@ class DDPG:
 
         # Update the actor policy using the sampled gradient:
         action_batch_for_gradients = self.actor_network.actions(state_batch)
+        with open('/home/ruizhao/Desktop/a.txt', 'a') as f:
+            print("action_batch[0]", file=f)
+            print(action_batch[0], file=f)
         q_gradient_batch = self.critic_network.gradients(state_batch,action_batch_for_gradients)
-        # print(q_gradient_batch)
+        with open('/home/ruizhao/Desktop/a.txt', 'a') as f:
+            print("q_gradient_batch[0]", file=f)
+            print(q_gradient_batch[0], file=f)
         self.actor_network.train(q_gradient_batch,state_batch)
 
         # Update the target networks

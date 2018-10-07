@@ -4,8 +4,10 @@ import numpy as np
 import math
 
 
-LAYER1_SIZE = 400
-LAYER2_SIZE = 300
+LAYER1_SIZE = 1024
+LAYER2_SIZE = 512
+LAYER3_SIZE = 256
+LAYER4_SIZE = 128
 LEARNING_RATE = 1e-3
 TAU = 0.001
 L2 = 0.01
@@ -46,7 +48,8 @@ class CriticNetwork:
 		# the layer size could be changed
 		layer1_size = LAYER1_SIZE
 		layer2_size = LAYER2_SIZE
-
+		layer3_size = LAYER3_SIZE
+		layer4_size = LAYER4_SIZE
 		state_input = tf.placeholder("float",[None,state_dim])
 		action_input = tf.placeholder("float",[None,action_dim])
 		critic_input = tf.concat([state_input, action_input], 1)
@@ -54,8 +57,12 @@ class CriticNetwork:
 		b1 = self.variable([layer1_size], state_dim + action_dim)
 		W2 = self.variable([layer1_size, layer2_size], layer1_size)
 		b2 = self.variable([layer2_size], layer2_size)
-		W3 = tf.Variable(tf.random_uniform([layer2_size, 1], -3e-3, 3e-3))
-		b3 = tf.Variable(tf.random_uniform([1], -3e-3, 3e-3))
+		W3 = self.variable([layer2_size, layer3_size], layer2_size)
+		b3 = self.variable([layer3_size], layer3_size)
+		W4 = self.variable([layer3_size, layer4_size], layer3_size)
+		b4 = self.variable([layer4_size], layer4_size)
+		W5 = tf.Variable(tf.random_uniform([layer4_size, 1], -3e-3, 3e-3))
+		b5 = tf.Variable(tf.random_uniform([1], -3e-3, 3e-3))
 		
 		# W1 = self.variable([state_dim,layer1_size],state_dim)
 		# b1 = self.variable([layer1_size],state_dim)
@@ -67,9 +74,11 @@ class CriticNetwork:
 
 		layer1 = tf.nn.leaky_relu(tf.matmul(critic_input,W1) + b1, alpha=0.01)
 		layer2 = tf.nn.leaky_relu(tf.matmul(layer1,W2) + b2, alpha=0.01)
-		q_value_output = tf.identity(tf.matmul(layer2,W3) + b3)
+		layer3 = tf.nn.leaky_relu(tf.matmul(layer2,W3) + b3, alpha=0.01)
+		layer4 = tf.nn.leaky_relu(tf.matmul(layer3,W4) + b4, alpha=0.01)
+		q_value_output = tf.identity(tf.matmul(layer4,W5) + b5)
 
-		return state_input,action_input,q_value_output,[W1,b1,W2,b2,W3,b3]
+		return state_input,action_input,q_value_output,[W1,b1,W2,b2,W3,b3,W4,b4,W5,b5]
 
 	def create_target_q_network(self,state_dim,action_dim,net):
 		state_input = tf.placeholder("float",[None,state_dim])
@@ -80,9 +89,11 @@ class CriticNetwork:
 		target_update = ema.apply(net)
 		target_net = [ema.average(x) for x in net]
 
-		layer1 = tf.nn.relu(tf.matmul(critic_input,target_net[0]) + target_net[1])
-		layer2 = tf.nn.relu(tf.matmul(layer1,target_net[2]) + target_net[3])
-		q_value_output = tf.identity(tf.matmul(layer2,target_net[4]) + target_net[5])
+		layer1 = tf.nn.leaky_relu(tf.matmul(critic_input,target_net[0]) + target_net[1], alpha=0.01)
+		layer2 = tf.nn.leaky_relu(tf.matmul(layer1,target_net[2]) + target_net[3], alpha=0.01)
+		layer3 = tf.nn.leaky_relu(tf.matmul(layer2,target_net[4] + target_net[5]), alpha=0.01)
+		layer4 = tf.nn.leaky_relu(tf.matmul(layer3,target_net[6] + target_net[7]), alpha=0.01)
+		q_value_output = tf.identity(tf.matmul(layer4,target_net[8]) + target_net[9])
 
 		return state_input,action_input,q_value_output,target_update
 

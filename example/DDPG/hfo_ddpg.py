@@ -27,6 +27,10 @@ def distance(a, b):
 
 def CalReward(agent, state, next_state, status):
     reward = 0
+    # state[9] = 0
+    # if min(state) == -2 or state[0] == -1 or state[1] == -1 or state[0] ==1 or state[1] == 1:
+    #     state[9] = -2
+    #     return -100
     if agent.has_kicked:
         if ~agent.laststep_haskicked:
             reward += 1
@@ -35,11 +39,22 @@ def CalReward(agent, state, next_state, status):
     reward = reward + distance([state[0], state[1]], [state[3], state[4]]) - distance([next_state[0], next_state[1]], [next_state[3], next_state[4]])
     reward = reward + 3 * distance([state[3], state[4]], [1,0])
     reward = reward - 3 * distance([next_state[3], next_state[4]], [1,0])#[1,0] is the goal position
-    
+    state[9]=-2
     return reward
+
+def state_violated(state):
+    state_invalid = False
+    state9 = state[9]
+    state[9] = 0
+    if min(state) == -2 or state[0] == -1 or state[1] == -1 or state[0] ==1 or state[1] == 1:
+        state_invalid = True
+        
+    state[9] = state9
+    return state_invalid
 
 def env_step(agent, hfo_env, action):
     state = hfo_env.getState()
+    
     if agent.has_kicked:
         agent.laststep_haskicked = True
     maximum = np.max(action[:4])
@@ -65,11 +80,15 @@ def env_step(agent, hfo_env, action):
     else:
         # hfo_env.act(hfo.TACKLE, action[7])
         ##print("tackle")
-        hfo_env.act(hfo.DASH, action[4], action[5])
+        pass
     status = hfo_env.step()
     next_state = hfo_env.getState()
+    fuck = state_violated(next_state)
     reward = CalReward(agent, state, next_state, status)
-    if status == hfo.IN_GAME:
+    
+    if fuck:
+        done = True
+    elif status == hfo.IN_GAME:
         done = False
     else:
         done = True
@@ -83,38 +102,50 @@ def main():
     hfo_env = hfo.HFOEnvironment()
     hfo_env.connectToServer(hfo.HIGH_LEVEL_FEATURE_SET)
     agent = DDPG()
-    model_file=tf.train.latest_checkpoint('ckpt/')
-    agent.saver.restore(agent.sess,model_file)
-    for episode in range(EPISODES):
+    # model_file=tf.train.latest_checkpoint('ckpt/')
+    # agent.saver.restore(agent.sess,model_file)
+    for episode in range(130):
         status = hfo.IN_GAME
-        
+        stop_perceive = False
+        with open('/home/ruizhao/Desktop/a.txt', 'a') as f:
+            print('Hello World!', file=f)
         while True:
+            
             state = hfo_env.getState()
             # print(state)
             action = agent.noise_action(state)
+            print(action)
             next_state, reward, done, status = env_step(agent, hfo_env, action)
-
-            agent.perceive(state,action,reward,next_state,done)
-            if done:
+            # print(reward)
+            if state_violated(next_state):
+                # print("hhhhhhhhhhhhhh")
+                stop_perceive = True
+            if not stop_perceive:
+                # print(state, next_state,done)
+                # print(stop_perceive)
+                agent.perceive(state,action,reward,next_state,done)
+            if status != hfo.IN_GAME:
                 break
         if status == hfo.SERVER_DOWN:
             hfo_env.act(hfo.QUIT)
             exit()
-        print(episode)
-        print(episode % 100 == 0 and episode > 100)
+        # print(episode)
+        # print(episode % 100 == 0 and episode > 100)
         if episode % 100 == 0 and episode > 100:
+        # if True:
             total_reward = 0
             for i in range(TEST):
                 # state = env.reset()
                 while True:
+                    state = hfo_env.getState()
                     action = agent.action(state)
-                    state, reward, done, status = env_step(agent, hfo_env, action)
+                    next_state, reward, done, status = env_step(agent, hfo_env, action)
                     total_reward += reward
                     if done:
                         break
             ave_reward = total_reward/TEST
             agent.saver.save(agent.sess,'ckpt/mnist.ckpt',global_step=episode)
-            print('episode: ', episode, 'Evaluation Average Reward:', ave_reward)
+            print('             episode: ', episode, 'Evaluation Average Reward:', ave_reward)
         
 
 
